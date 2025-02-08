@@ -6,8 +6,8 @@ using BenchmarkTools
 
 include("spatial_hashing.jl")
 include("window.jl")
-
 include("input.jl")
+include("camera.jl")
 include("particle_simulation.jl")
 include("particle_renderer.jl")
 
@@ -16,12 +16,14 @@ import .SpatialHashing
 import .ParticleRenderer
 import .Window
 import .Input
+import .Camera
 
 # Initialisation
-n = 2 << 14
-simulation = ParticleSimulation.init(n, Float32(0.02))
+n = 1 << 17
+simulation = ParticleSimulation.init(n, Float32(0.05))
 renderer = ParticleRenderer.init(1200, 1200, "SPH", n)
 input = Input.init()
+camera = Camera.init(Float32(1200 / 1200), Float32(2.0))
 SpatialHashing.update(simulation.particle_hash)
 
 # Main loop
@@ -34,9 +36,10 @@ dt = 0.0
 while !Window.should_close(renderer.window)
     
     Input.update(input, renderer.window.window)
-    ParticleSimulation.update(simulation, input, frame_time * 0.05)
+    Camera.update(input, camera, dt)
+    ParticleSimulation.update(simulation, input, dt * 0.01)
     
-    if !ParticleRenderer.redraw(renderer, simulation.particle_hash)
+    if !ParticleRenderer.redraw(renderer, simulation.particle_hash, camera)
         break
     end
 

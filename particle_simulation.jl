@@ -48,10 +48,7 @@ module ParticleSimulation
     function init(n, grid_size::Float32)
 
         nx = ceil(sqrt(n))
-        ny = nx
-        count = 0
-
-        cpu_particles = StructArray([Particle(((i % nx) / nx) , ((i / nx) / nx)* 2.0 - 1.0, zero(Float32),
+        cpu_particles = StructArray([Particle(((i % nx) / nx) , ((i / nx) / nx), rand(Float32),
                                               zero(Float32), zero(Float32), zero(Float32),
                                               zero(Float32), zero(Float32), zero(Float32),
                                               one(Float32), zero(Float32), zero(Float32)) for i in 1:n])
@@ -75,14 +72,14 @@ module ParticleSimulation
 
         spatial_hash = SpatialHashing.init(replace_storage(CuArray, StructArray(cpu_particles)), grid_size)
 
-        sigma = grid_size / 3.0
+        sigma = grid_size / 2.0
         
         return SimulationData(spatial_hash, 
                                 EXPONENTIAL_WEIGHTS(sigma).func,
                                 EXPONENTIAL_WEIGHTS(sigma).dfunc,
                                 EXPONENTIAL_WEIGHTS(sigma).d2func,
                                 sigma,
-                                 10.0, 1.0, 100.0,
+                                 10.0, 2.0, 100.0,
                                 [0.0, -981, 0.0]
                             )
     end
@@ -151,7 +148,7 @@ module ParticleSimulation
             end
         end
     
-        particles.density[i] = density_value
+        particles.density[i] = max(density_value, particles.mass[i])
         particles.pressure[i] = k * ((density_value / rho0)^7 - 1.0)
     
         return
@@ -171,6 +168,7 @@ module ParticleSimulation
         density = particles.density[i]
         pressure = particles.pressure[i]
         mass = particles.mass[i]
+
         pos_x, pos_y, pos_z = particles.x[i], particles.y[i], particles.z[i]
         vel_x, vel_y, vel_z = particles.vx[i], particles.vy[i], particles.vz[i]
     
@@ -186,7 +184,7 @@ module ParticleSimulation
                     toOther_x = other_x - pos_x
                     toOther_y = other_y - pos_y
                     toOther_z = other_z - pos_z
-                    distance = CUDA.sqrt(toOther_x^2 + toOther_y^2 + toOther_z^2)
+                    distance = max(CUDA.sqrt(toOther_x^2 + toOther_y^2 + toOther_z^2), 0.0001)
 
                     if distance < grid_size
                         
@@ -226,57 +224,67 @@ module ParticleSimulation
         accY += gravity_y
         accZ += gravity_z
 
-        mouseDist = CUDA.sqrt((pos_x - mouse_x)^2 + (pos_y - mouse_y)^2 + (pos_z - 0.0)^2)
+        # mouseDist = max(CUDA.sqrt((pos_x - mouse_x)^2 + (pos_y - mouse_y)^2 + (pos_z - 0.0)^2), 0.0001)
 
-        if mouseDist < 0.15
-            strength = 10000.0
-            
-            if mouse_right != 1 && mouse_left != 1
-                strength = 0.0
-            end
-
-            if mouse_right == 1
-                strength = -strength
-            end
-
-            accX += (pos_x - mouse_x) / mouseDist * strength
-            accY += (pos_y - mouse_y) / mouseDist * strength
-        end
+#         if mouseDist < 0.15
+#             strength = 10000.0
+#             
+#             if mouse_right != 1 && mouse_left != 1
+#                 strength = 0.0
+#             end
+# 
+#             if mouse_right == 1
+#                 strength = -strength
+#             end
+# 
+#             accX += (pos_x - mouse_x) / mouseDist * strength
+#             accY += (pos_y - mouse_y) / mouseDist * strength
+#         end
 
         particles.vx[i] += dt * accX
         particles.vy[i] += dt * accY
+        particles.vz[i] += dt * accZ
+
+        # particles.vx[i] *= 0.99
+        # particles.vy[i] *= 0.99
         
-        elasticity = 0.0
+        elasticity = 0.99
         # particles.vz[i] += dt * accZ
+
+     
+
+        particles.vx[i] = clamp(particles.vx[i], -50.0, 50.0)
+        particles.vy[i] = clamp(particles.vy[i], -50.0, 50.0)
+        particles.vz[i] = clamp(particles.vz[i], -50.0, 50.0)
 
         if particles.x[i] < -1.0
             particles.x[i] = -2.0 - particles.x[i]
-            particles.vx[i] = -elasticity * particles.vx[i]
+            particles.vx[i] = elasticity * abs(particles.vx[i])
         end
 
         if particles.x[i] > 1.0
             particles.x[i] = 2.0 - particles.x[i]
-            particles.vx[i] = -elasticity * particles.vx[i]
+            particles.vx[i] = -elasticity * abs(particles.vx[i]) 
         end
 
         if particles.y[i] < -1.0
             particles.y[i] = -2.0 - particles.y[i]
-            particles.vy[i] = -elasticity * particles.vy[i]
+            particles.vy[i] = elasticity * abs(particles.vy[i]) 
         end
 
         if particles.y[i] > 1.0
             particles.y[i] = 2.0 - particles.y[i]
-            particles.vy[i] = -elasticity * particles.vy[i]
+            particles.vy[i] = -elasticity * abs(particles.vy[i]) 
         end
 
         if particles.z[i] < -1.0
             particles.z[i] = -2.0 - particles.z[i]
-            particles.vz[i] = -elasticity * particles.vz[i]
+            particles.vz[i] = elasticity * abs(particles.vz[i]) 
         end
 
         if particles.z[i] > 1.0
             particles.z[i] = 2.0 - particles.z[i]
-            particles.vz[i] = -elasticity * particles.vz[i]
+            particles.vz[i] = -elasticity * abs(particles.vz[i])
         end
 
         particles.x[i] = clamp(particles.x[i], -1.0, 1.0)
@@ -286,7 +294,7 @@ module ParticleSimulation
         if i <= length(particles.x)
             particles.x[i] += particles.vx[i] * dt
             particles.y[i] += particles.vy[i] * dt
-            # particles.z[i] += particles.vz[i] * dt
+            particles.z[i] += particles.vz[i] * dt
         end
 
         return

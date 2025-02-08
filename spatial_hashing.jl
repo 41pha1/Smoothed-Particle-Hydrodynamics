@@ -21,9 +21,9 @@ module SpatialHashing
         grid_y::Int32 = Int32(floor(y / grid_size))
         grid_z::Int32 = Int32(floor(z / grid_size))
 
-        intermediate::Int32 = Int32(grid_x) * Int32(881) + Int32(grid_y) * Int32(739) + Int32(grid_z) * Int32(997) + Int32(9733)
+        intermediate::Int32 = ( (Int32(grid_x) * Int32(73856093)) ⊻ (Int32(grid_y) * Int32(19349663)) ⊻ (Int32(grid_z) * Int32(83492791)) )
 
-        return UInt32(abs(intermediate) % Int32(n))
+        return Int32(abs(intermediate + 10) % Int32(n))
     end
 
     function hash_data_kernel(hash, particles, grid_size::Float32, n::Int64)

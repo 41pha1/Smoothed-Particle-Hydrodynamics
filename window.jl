@@ -333,6 +333,8 @@ module Window
         glViewport(0, 0, width, height)
         glPolygonMode(GL_FRONT_AND_BACK, GL_TRIANGLES)
 
+        GLFW.SetInputMode(window, GLFW.CURSOR, GLFW.CURSOR_DISABLED)
+
         return WindowData(window)
     end
 

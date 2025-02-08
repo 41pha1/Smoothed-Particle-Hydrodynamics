@@ -3,7 +3,7 @@ module ParticleShader  # extends Shader module
     FRAGMENT_SHADER_PATH = "res/shaders/particle_fragment.glsl"
     VERTEX_SHADER_PATH = "res/shaders/particle_vertex.glsl"
 
-    using ...SpatialHashing, ..Shader, ModernGL, StructArrays
+    using ...SpatialHashing, ..Shader, ModernGL, StructArrays, ...Camera
 
     
     struct BufferedTexture
@@ -70,7 +70,7 @@ module ParticleShader  # extends Shader module
         return data
     end
 
-    function update_particle_positions(particle_shader_data::ParticleShaderData, particles::SpatialHashing.HashData)
+    function update_particle_positions(particle_shader_data::ParticleShaderData, particles::SpatialHashing.HashData,)
 
         # for now move the data to the cpu and then back to the gpu
         cpu_particles = replace_storage(Array, particles.spatial_data)
@@ -166,7 +166,7 @@ module ParticleShader  # extends Shader module
 
     end
 
-    function use(particle_shader_data::ParticleShaderData, particles::SpatialHashing.HashData)
+    function use(particle_shader_data::ParticleShaderData, particles::SpatialHashing.HashData, camera::Camera.CameraData)
 
         shader_program = particle_shader_data.shader_data.shaderProgram
         particle_texture = particle_shader_data.particle_texture.texture
@@ -202,7 +202,23 @@ module ParticleShader  # extends Shader module
         loc = glGetUniformLocation(shader_program, "gridSize")
         glUniform1f(loc, particles.grid_size)
         loc = glGetUniformLocation(shader_program, "brightnessFactor")
-        glUniform1f(loc, 0.05)
+        glUniform1f(loc, 0.1)
+
+        # Domain 
+        loc = glGetUniformLocation(shader_program, "boxMin")
+        glUniform3f(loc, -1.0, -1.0, -1.0)
+        loc = glGetUniformLocation(shader_program, "boxMax")
+        glUniform3f(loc, 1.0, 1.0, 1.0)
+
+        # Camera
+        loc = glGetUniformLocation(shader_program, "cameraPosition")
+        glUniform3f(loc, camera.position[1], camera.position[2], camera.position[3])
+        loc = glGetUniformLocation(shader_program, "cameraDirection")
+        glUniform3f(loc, camera.direction[1], camera.direction[2], camera.direction[3])
+        loc = glGetUniformLocation(shader_program, "aspectRatio")
+        glUniform1f(loc, camera.aspect_ratio)
+        loc = glGetUniformLocation(shader_program, "fov")
+        glUniform1f(loc, camera.fov)
 
         Shader.use(particle_shader_data.shader_data)
     end

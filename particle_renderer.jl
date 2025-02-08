@@ -3,7 +3,7 @@ module ParticleRenderer
     include("particle_shader.jl")
     include("mesh.jl")
 
-    using GLFW, ..SpatialHashing, .Shader, .Mesh, ..Window, .ParticleShader, ModernGL
+    using GLFW, ..SpatialHashing, .Shader, .Mesh, ..Window, .ParticleShader, ModernGL, ..Camera
 
     struct ParticleRendererData
         window::Window.WindowData
@@ -20,10 +20,10 @@ module ParticleRenderer
         return ParticleRendererData(window, screen_quad, particle_shader)
     end
 
-    function redraw(renderer_data::ParticleRendererData, particles::SpatialHashing.HashData)
+    function redraw(renderer_data::ParticleRendererData, particles::SpatialHashing.HashData, camera::Camera.CameraData)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        ParticleShader.use(renderer_data.particle_shader, particles)
+        ParticleShader.use(renderer_data.particle_shader, particles, camera)
         Mesh.draw(renderer_data.screen_quad)
 
         GLFW.SwapBuffers(renderer_data.window.window)
